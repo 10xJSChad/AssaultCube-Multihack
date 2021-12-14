@@ -1,4 +1,4 @@
-# AssaultCube-Radar-Aimbot-Hack
+# AssaultCube Radar & Aimbot Hack
 ### How to use:
 1. Load up AssaultCube 1.3.0.0
 2. Run 'ac cheat.py'
