@@ -4,7 +4,9 @@ from tkinter import ttk
 import math
 import struct
 import win32api
-
+import win32con
+import ctypes
+import random
 
 rwm = ReadWriteMemory()
 process = rwm.get_process_by_name('ac_client.exe')
@@ -67,7 +69,7 @@ player_test = process.get_pointer(player_array, offsets=[0x08, 0xEC])
 master = Tk()
 master.overrideredirect(1)
 master.attributes('-topmost', True)
-master.wm_attributes('-transparentcolor', '#ab23ff')
+master.wm_attributes("-transparentcolor", "white")
 canvas = Canvas(master, width=200, height=200)
 
 def aim(yaw, pitch):
@@ -113,13 +115,48 @@ def get_closest_enemy(aim=False):
             
     if positions[lowest[0]][3] != local_player.team():
         get_vector_between_player(enemypos=positions[lowest[0]], toggle_aim=True)
+        return(positions[lowest[0]])
         
+ 
+telekill_target_index = None
+def telekill():
+    global telekill_target_index
+    positions = get_all_player_positions()
+    if positions == []: return
+    
+    if telekill_target_index == None:
+        telekill_target_index = random.randint(0, len(positions)-1)
+        return
+    else:
+        telekill_target = positions[telekill_target_index]
+        
+    if telekill_target[3] == local_player.team() or telekill_target[4] < 0 or telekill_target[4] > 100:
+        telekill_target_index = None
+        return
+
+    x_pointer = process.get_pointer(local_player_address, offsets=[0x04])
+    y_pointer = process.get_pointer(local_player_address, offsets=[0x08])
+    z_pointer = process.get_pointer(local_player_address, offsets=[0x0C])
+     
+    converted_enemy_x = struct.unpack("<I", struct.pack("<f", telekill_target[0]))
+    converted_enemy_y = struct.unpack("<I", struct.pack("<f", telekill_target[2]))
+    converted_enemy_z = struct.unpack("<I", struct.pack("<f", telekill_target[1]))
+    
+    process.write(x_pointer, converted_enemy_x[0])
+    process.write(y_pointer, converted_enemy_y[0])
+    process.write(z_pointer, converted_enemy_z[0])
+    
+    ctypes.windll.user32.mouse_event(2, 0, 0, 0,0)
     
 
+       
 def draw_radar():
     while True:
         if win32api.GetAsyncKeyState(ord('Q')) != 0:
             get_closest_enemy(True)
+            
+        if win32api.GetAsyncKeyState(ord('H')) != 0:
+            telekill()
             
         positions = get_all_player_positions()
         if positions == []: pass
