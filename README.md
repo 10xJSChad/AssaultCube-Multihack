@@ -1,9 +1,10 @@
-# AssaultCube Radar & Aimbot Hack
+# AssaultCube Multihack
 ### How to use:
 1. Load up AssaultCube 1.3.0.0
 2. Run 'ac cheat.py'
 3. Hold Q to use the aimbot
 4. Hold H to use the telekill
+5. Press C to toggle speedhack
 
 ### Problems:
 * The radar is a bit short ranged, I could change it but I prefer it this way.
