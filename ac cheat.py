@@ -7,6 +7,8 @@ import win32api
 import win32con
 import ctypes
 import random
+import time
+import threading
 
 rwm = ReadWriteMemory()
 process = rwm.get_process_by_name('ac_client.exe')
@@ -20,6 +22,13 @@ player_count = 0x00587C18
 
 position_offsets = [0x04, 0x08, 0x0C] #Unused
 camera_offsets = [0x34, 0x38] #Unused
+
+speedhack_value = 3
+aim_assist_fov = 5
+aim_assist_enabled = True
+aim_assist_speed = 0.05
+radar_enabled = True
+in_menu = False
 
 class local_player():
     def health():
@@ -67,11 +76,86 @@ def get_all_player_positions(float=True):
 
 player_test = process.get_pointer(player_array, offsets=[0x08, 0xEC])
 
-master = Tk()
-master.overrideredirect(1)
-master.attributes('-topmost', True)
-master.wm_attributes("-transparentcolor", "white")
-canvas = Canvas(master, width=200, height=200)
+def menu():
+    global speedhack_value, aim_assist_enabled, aim_assist_fov, radar_enabled, aim_assist_speed
+    top = Tk()   
+    top.geometry("350x130") 
+    top.overrideredirect(1)
+    top.attributes('-topmost', True)
+    top.geometry('+0+200')
+    
+    speed_text = StringVar()
+    speed_text.set("Speedhack: 3")
+    speed_label = Label(top, 
+                    textvariable=speed_text, font=("Courier", 18)).place(x=0, y=0)
+    
+    aimassist_toggle_text = StringVar()
+    aimassist_toggle_text.set("Aim Assist: ON")
+    aimassist_toggle_label = Label(top, 
+                    textvariable=aimassist_toggle_text, font=("Courier", 18)).place(x=0, y=25)
+    
+    aimassist_text = StringVar()
+    aimassist_text.set("Aim Assist FOV: 5")
+    aimassist_label = Label(top, 
+                    textvariable=aimassist_text, font=("Courier", 18)).place(x=0, y=50)
+    
+    aimassist_speed_text = StringVar()
+    aimassist_speed_text.set("Radar: ON")
+    aimassist_speed_label = Label(top, 
+                    textvariable=aimassist_speed_text, font=("Courier", 18)).place(x=0, y=75)
+    
+    radar_toggle_text = StringVar()
+    radar_toggle_text.set("Radar: ON")
+    radar_label = Label(top, 
+                    textvariable=radar_toggle_text, font=("Courier", 18)).place(x=0, y=100)
+    
+    text_objects = [speed_text, aimassist_toggle_text, aimassist_text, aimassist_speed_text, radar_toggle_text]
+    
+    selected = -0
+    while True:
+        text = ["Speedhack: " + str(speedhack_value), "Aim Assist: " + str(aim_assist_enabled), "Aim Assist FOV: " + str(aim_assist_fov), "Aim Assist Speed: " + str(aim_assist_speed), "Radar: " + str(radar_enabled)]
+        
+        for i in range(0, len(text_objects)):
+            if i != selected:
+                text_objects[i].set(text[i])
+            else:
+                text_objects[selected].set(text[selected] + " <---")
+        
+        if win32api.GetAsyncKeyState(win32con.VK_UP) != 0: 
+            time.sleep(0.1)
+            if selected > 0: 
+                selected -= 1
+            text_objects[selected].set(text[selected] + " <---")
+            
+        if win32api.GetAsyncKeyState(win32con.VK_DOWN) != 0: 
+            time.sleep(0.1)
+            if selected < len(text_objects) - 1: 
+                selected += 1
+            text_objects[selected].set(text[selected] + " <---")
+            
+        if win32api.GetAsyncKeyState(win32con.VK_RIGHT) != 0: 
+            time.sleep(0.1)
+            if selected == 0: speedhack_value += 1
+            if selected == 1: aim_assist_enabled = not aim_assist_enabled
+            if selected == 2: aim_assist_fov += 1
+            if selected == 3: aim_assist_speed += 0.01
+            if selected == 4: radar_enabled = not radar_enabled
+            
+        if win32api.GetAsyncKeyState(win32con.VK_LEFT) != 0: 
+            time.sleep(0.1)
+            if selected == 0: speedhack_value -= 1
+            if selected == 1: aim_assist_enabled = not aim_assist_enabled
+            if selected == 2: aim_assist_fov -= 1
+            if selected == 3: aim_assist_speed -= 0.01
+            if selected == 4: radar_enabled = not radar_enabled
+            
+        if win32api.GetAsyncKeyState(ord('M')) != 0:
+            time.sleep(0.1)
+            top.destroy()
+            draw_radar()
+            
+        top.update() 
+
 
 def is_teammate(target):
     current_gamemode = process.read(gamemode_address)
@@ -92,6 +176,30 @@ def aim(yaw, pitch):
     process.write(yaw_pointer, converted_yaw[0])
     process.write(pitch_pointer, converted_pitch[0])
 
+def aim_assist(yaw_and_pitch):
+    yaw_target = yaw_and_pitch[0]
+    pitch_target = yaw_and_pitch[1]
+    
+    yaw_pointer = process.get_pointer(local_player_address, offsets=[0x34])
+    pitch_pointer = process.get_pointer(local_player_address, offsets=[0x38])
+    
+    player_yaw = process.read(yaw_pointer, True)
+    player_pitch = process.read(pitch_pointer, True)
+    
+    if int(player_yaw) > int(yaw_target):
+        converted_yaw = struct.unpack("<I", struct.pack("<f", player_yaw - aim_assist_speed))
+        process.write(yaw_pointer, converted_yaw[0])
+    elif int(player_yaw) < int(yaw_target):
+        converted_yaw = struct.unpack("<I", struct.pack("<f", player_yaw + aim_assist_speed))
+        process.write(yaw_pointer, converted_yaw[0])
+        
+    if int(player_pitch) > int(pitch_target):
+        converted_pitch = struct.unpack("<I", struct.pack("<f", player_pitch - aim_assist_speed))
+        process.write(pitch_pointer, converted_pitch[0])
+    elif int(player_pitch) < int(pitch_target):
+        converted_pitch = struct.unpack("<I", struct.pack("<f", player_pitch + aim_assist_speed))
+        process.write(pitch_pointer, converted_pitch[0])
+    
 def get_vector_between_player(localpos=False, enemypos=False, toggle_aim=False):
     if localpos == False:
         localpos = local_player.position()
@@ -111,20 +219,25 @@ def get_vector_between_player(localpos=False, enemypos=False, toggle_aim=False):
     if toggle_aim:
         aim(yaw, pitch)
     else:
-        return yaw
+        return (yaw, pitch)
 
-def get_closest_enemy(aim=False):
+def get_closest_enemy(aimbot=False, aimassist=False):
     positions = get_all_player_positions()
     player_yaw = process.read(process.get_pointer(local_player_address, offsets=[0x34]), True)
-    lowest = [0, 360]
+    player_pitch = process.read(process.get_pointer(local_player_address, offsets=[0x38]), True)
+    lowest = [0, 360, 360]
     for i, x in enumerate(positions): 
-        difference = abs(player_yaw - get_vector_between_player(enemypos=x))
+        difference = abs(player_yaw - get_vector_between_player(enemypos=x)[0])
         if difference < lowest[1] and not is_teammate(x) and x[4] > 0 and x[4] < 101: 
             lowest[0] = i
-            lowest[1] = abs(player_yaw - get_vector_between_player(enemypos=x))
+            lowest[1] = abs(player_yaw - get_vector_between_player(enemypos=x)[0])
+            lowest[2] = abs(player_pitch - get_vector_between_player(enemypos=x)[1])
             
     if not is_teammate(positions[lowest[0]]):
-        get_vector_between_player(enemypos=positions[lowest[0]], toggle_aim=True)
+        if aimbot:
+            get_vector_between_player(enemypos=positions[lowest[0]], toggle_aim=True)
+        if aimassist and lowest[1] < aim_assist_fov and lowest[2] < aim_assist_fov:
+            aim_assist(get_vector_between_player(enemypos=positions[lowest[0]]))
         return(positions[lowest[0]])
         
  
@@ -160,11 +273,24 @@ def telekill():
     
 def speedhack():
     speed_pointer = process.get_pointer(local_player_address, offsets=[0x74])
-    process.write(speed_pointer, 3)
+    process.write(speed_pointer, speedhack_value)
     
        
 def draw_radar():
+    global in_menu
+    master = Tk()
+    master.overrideredirect(1)
+    master.attributes('-topmost', True)
+    master.wm_attributes("-transparentcolor", "white")
+    canvas = Canvas(master, width=200, height=200)
+    
+    if not radar_enabled:
+        master.geometry('+0-5000')
+    
     while True:
+        if aim_assist_enabled:
+            get_closest_enemy(aimassist=True)
+            
         if win32api.GetAsyncKeyState(ord('Q')) != 0:
             get_closest_enemy(True)
             
@@ -173,6 +299,11 @@ def draw_radar():
             
         if win32api.GetAsyncKeyState(ord('C')) != 0:
             speedhack()
+            
+        if win32api.GetAsyncKeyState(ord('M')) != 0:
+            time.sleep(0.1)
+            master.destroy()
+            menu()
             
         positions = get_all_player_positions()
         if positions == []: pass
@@ -200,5 +331,5 @@ def draw_radar():
         canvas.pack()
         master.update()
         canvas.delete("all")
-    
+        
 draw_radar()
