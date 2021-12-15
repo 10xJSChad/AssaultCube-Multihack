@@ -14,6 +14,7 @@ process.open()
 
 game_address = 0x00400000 #Unused
 local_player_address = 0x00587C0C
+gamemode_address = 0x0059FC11
 player_array = 0x00587C10
 player_count = 0x00587C18
 
@@ -72,6 +73,15 @@ master.attributes('-topmost', True)
 master.wm_attributes("-transparentcolor", "white")
 canvas = Canvas(master, width=200, height=200)
 
+def is_teammate(target):
+    current_gamemode = process.read(gamemode_address)
+    if current_gamemode == 539118916 or current_gamemode == 575489090: 
+        return False
+    if target[3] == local_player.team():
+        return True
+    else:
+        return False
+    
 def aim(yaw, pitch):
     yaw_pointer = process.get_pointer(local_player_address, offsets=[0x34])
     pitch_pointer = process.get_pointer(local_player_address, offsets=[0x38])
@@ -109,11 +119,11 @@ def get_closest_enemy(aim=False):
     lowest = [0, 360]
     for i, x in enumerate(positions): 
         difference = abs(player_yaw - get_vector_between_player(enemypos=x))
-        if difference < lowest[1] and x[3] != local_player.team() and x[4] > 0 and x[4] < 101: 
+        if difference < lowest[1] and not is_teammate(x) and x[4] > 0 and x[4] < 101: 
             lowest[0] = i
             lowest[1] = abs(player_yaw - get_vector_between_player(enemypos=x))
             
-    if positions[lowest[0]][3] != local_player.team():
+    if not is_teammate(positions[lowest[0]]):
         get_vector_between_player(enemypos=positions[lowest[0]], toggle_aim=True)
         return(positions[lowest[0]])
         
@@ -130,7 +140,7 @@ def telekill():
     else:
         telekill_target = positions[telekill_target_index]
         
-    if telekill_target[3] == local_player.team() or telekill_target[4] < 0 or telekill_target[4] > 100:
+    if is_teammate(telekill_target) or telekill_target[4] < 0 or telekill_target[4] > 100:
         telekill_target_index = None
         return
 
@@ -148,7 +158,10 @@ def telekill():
     
     ctypes.windll.user32.mouse_event(2, 0, 0, 0,0)
     
-
+def speedhack():
+    speed_pointer = process.get_pointer(local_player_address, offsets=[0x74])
+    process.write(speed_pointer, 3)
+    
        
 def draw_radar():
     while True:
@@ -157,6 +170,9 @@ def draw_radar():
             
         if win32api.GetAsyncKeyState(ord('H')) != 0:
             telekill()
+            
+        if win32api.GetAsyncKeyState(ord('C')) != 0:
+            speedhack()
             
         positions = get_all_player_positions()
         if positions == []: pass
@@ -167,7 +183,7 @@ def draw_radar():
             canvas.move(entity, 100, 100)
             
         for pos in positions:  
-            if(pos[3] == local_player.team()):
+            if(is_teammate(pos)):
                 color = "blue"
             else:
                 color = "red"    
