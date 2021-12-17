@@ -205,16 +205,23 @@ def get_vector_between_player(localpos=False, enemypos=False, toggle_aim=False):
         localpos = local_player.position()
         
     if enemypos == False:
-        enemypos = get_all_player_positions()[0]
+        enemypos = get_all_player_positions()
+        if enemypos != []:
+            enemypos = enemypos[0]
         
     x_diff = enemypos[0] - localpos[0]
     y_diff = enemypos[1] - localpos[1]
     z_diff = enemypos[2] - localpos[2]
     
+    
     dist = math.sqrt(z_diff * z_diff + x_diff * x_diff)
     pitch = math.atan2(y_diff, dist) *  180.0 / math.pi
-    yaw =  math.atan2(x_diff / dist, z_diff / dist) * 180 / math.pi
-    yaw = abs(yaw - 180)
+    
+    if dist > 0.0:
+        yaw =  math.atan2(x_diff / dist, z_diff / dist) * 180 / math.pi
+        yaw = abs(yaw - 180)
+    else:
+        yaw = 0
     
     if toggle_aim:
         aim(yaw, pitch)
@@ -223,6 +230,8 @@ def get_vector_between_player(localpos=False, enemypos=False, toggle_aim=False):
 
 def get_closest_enemy(aimbot=False, aimassist=False):
     positions = get_all_player_positions()
+    if positions == []: return
+    
     player_yaw = process.read(process.get_pointer(local_player_address, offsets=[0x34]), True)
     player_pitch = process.read(process.get_pointer(local_player_address, offsets=[0x38]), True)
     lowest = [0, 360, 360]
@@ -233,7 +242,7 @@ def get_closest_enemy(aimbot=False, aimassist=False):
             lowest[1] = abs(player_yaw - get_vector_between_player(enemypos=x)[0])
             lowest[2] = abs(player_pitch - get_vector_between_player(enemypos=x)[1])
             
-    if not is_teammate(positions[lowest[0]]):
+    if not is_teammate(positions[lowest[0]]) and (positions[lowest[0]][4] > 0 and positions[lowest[0]][4] < 101):
         if aimbot:
             get_vector_between_player(enemypos=positions[lowest[0]], toggle_aim=True)
         if aimassist and lowest[1] < aim_assist_fov and lowest[2] < aim_assist_fov:
